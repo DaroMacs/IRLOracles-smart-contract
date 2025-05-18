@@ -6,13 +6,14 @@ async function main() {
   const [deployer] = await hre.viem.getWalletClients();
   const publicClient = await hre.viem.getPublicClient();
 
+  console.log("Deploying IoTDeviceOracle contract...");
+  console.log("Deployer address:", deployer.account.address);
+
   // Deploy the IoTDeviceOracle contract
-  const contratoIoTDeviceOracle = await hre.viem.deployContract(
-    "IoTDeviceOracle",
-    [],
-  );
+  const iotDeviceOracle = await hre.viem.deployContract("IoTDeviceOracle", []);
+
   console.log(
-    `Contrato IoTDeviceOracle desplegado en ${contratoIoTDeviceOracle.address}`,
+    `IoTDeviceOracle contract deployed at ${iotDeviceOracle.address}`,
   );
 
   // Wait for the contract to be deployed
@@ -21,27 +22,53 @@ async function main() {
   // Contract verification after deployment
   try {
     await hre.run("verify:verify", {
-      address: contratoIoTDeviceOracle.address,
+      address: iotDeviceOracle.address,
       constructorArguments: [],
     });
-    console.log("Contrato verificado");
+    console.log("Contract verified successfully");
   } catch (error) {
-    console.log("Error verificando contrato:", error);
+    console.log("Error verifying contract:", error);
   }
 
-  // Create 5 devices by calling createDevice for each device name
+  // Create devices
   for (const device of devices) {
-    const tx = await contratoIoTDeviceOracle.write.createDevice([device], {
-      account: deployer.account.address,
-    });
+    try {
+      // Create device
+      const createTx = await iotDeviceOracle.write.createDevice([device], {
+        account: deployer.account.address,
+      });
 
-    // Wait for the transaction to be mined
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: tx });
-    if (receipt.status === "success") {
-      console.log(`Dispositivo ${device} creado exitosamente`);
-    } else {
-      console.log(`Falló la creación del dispositivo ${device}`);
+      const createReceipt = await publicClient.waitForTransactionReceipt({
+        hash: createTx,
+      });
+
+      if (createReceipt.status === "success") {
+        console.log(`Device ${device} created successfully`);
+      } else {
+        console.log(`Failed to create device ${device}`);
+      }
+    } catch (error) {
+      console.error(`Error processing device ${device}:`, error);
     }
+  }
+
+  // Display token information
+  try {
+    // @ts-ignore - Contract methods are available at runtime
+    const tokenName = await iotDeviceOracle.read.name();
+    // @ts-ignore - Contract methods are available at runtime
+    const tokenSymbol = await iotDeviceOracle.read.symbol();
+    // @ts-ignore - Contract methods are available at runtime
+    const deployerBalance = await iotDeviceOracle.read.balanceOf([
+      deployer.account.address,
+    ]);
+
+    console.log("\nToken Information:");
+    console.log(`Name: ${tokenName}`);
+    console.log(`Symbol: ${tokenSymbol}`);
+    console.log(`Deployer Balance: ${deployerBalance.toString()}`);
+  } catch (error) {
+    console.error("Error fetching token information:", error);
   }
 }
 
